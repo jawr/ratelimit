@@ -4,7 +4,7 @@ This package provides a Golang implementation of the leaky-bucket rate limit alg
 This implementation refills the bucket based on the time elapsed between
 requests instead of requiring an interval clock to fill the bucket discretely.
 
-Create a rate limiter with a maximum number of operations to perform per second.
+Create a rate limiter with a maximum number of operations to perform per minute.
 Call Take() before each operation. Take will sleep until you can continue.
 
 ```go
@@ -16,7 +16,7 @@ import (
 )
 
 func main() {
-    rl := ratelimit.New(100) // per second
+    rl := ratelimit.New(100) // per minute
 
     prev := time.Now()
     for i := 0; i < 10; i++ {

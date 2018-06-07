@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"go.uber.org/ratelimit"
-	"go.uber.org/ratelimit/internal/clock"
+	"github.com/jawr/ratelimit"
+	"github.com/jawr/ratelimit/internal/clock"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/uber-go/atomic"
@@ -26,15 +26,15 @@ func ExampleRatelimit() {
 	}
 
 	// Output:
-	// 1 10ms
-	// 2 10ms
-	// 3 10ms
-	// 4 10ms
-	// 5 10ms
-	// 6 10ms
-	// 7 10ms
-	// 8 10ms
-	// 9 10ms
+	// 1 600ms
+	// 2 600ms
+	// 3 600ms
+	// 4 600ms
+	// 5 600ms
+	// 6 600ms
+	// 7 600ms
+	// 8 600ms
+	// 9 600ms
 }
 
 func TestUnlimited(t *testing.T) {
@@ -66,22 +66,22 @@ func TestRateLimiter(t *testing.T) {
 	go job(rl, count, done)
 	go job(rl, count, done)
 
-	clock.AfterFunc(1*time.Second, func() {
+	clock.AfterFunc(1*time.Minute, func() {
 		assert.InDelta(t, 100, count.Load(), 10, "count within rate limit")
 	})
 
-	clock.AfterFunc(2*time.Second, func() {
+	clock.AfterFunc(2*time.Minute, func() {
 		assert.InDelta(t, 200, count.Load(), 10, "count within rate limit")
 	})
 
-	clock.AfterFunc(3*time.Second, func() {
+	clock.AfterFunc(3*time.Minute, func() {
 		assert.InDelta(t, 300, count.Load(), 10, "count within rate limit")
 		wg.Done()
 	})
 
-	clock.Add(4 * time.Second)
+	clock.Add(4 * time.Minute)
 
-	clock.Add(5 * time.Second)
+	clock.Add(5 * time.Minute)
 }
 
 func TestDelayedRateLimiter(t *testing.T) {
@@ -114,7 +114,7 @@ func TestDelayedRateLimiter(t *testing.T) {
 	}()
 
 	// Accumulate slack for 10 seconds,
-	clock.AfterFunc(20*time.Second, func() {
+	clock.AfterFunc(20*time.Minute, func() {
 		// Then start working.
 		go job(fast, count, done)
 		go job(fast, count, done)
@@ -122,12 +122,12 @@ func TestDelayedRateLimiter(t *testing.T) {
 		go job(fast, count, done)
 	})
 
-	clock.AfterFunc(30*time.Second, func() {
+	clock.AfterFunc(30*time.Minute, func() {
 		assert.InDelta(t, 1200, count.Load(), 10, "count within rate limit")
 		wg.Done()
 	})
 
-	clock.Add(40 * time.Second)
+	clock.Add(40 * time.Minute)
 }
 
 func job(rl ratelimit.Limiter, count *atomic.Int32, done <-chan struct{}) {

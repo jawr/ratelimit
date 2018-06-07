@@ -18,13 +18,13 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-package ratelimit // import "go.uber.org/ratelimit"
+package ratelimit // import "github.com/jawr/ratelimit"
 
 import (
 	"sync"
 	"time"
 
-	"go.uber.org/ratelimit/internal/clock"
+	"github.com/jawr/ratelimit/internal/clock"
 )
 
 // Note: This file is inspired by:
@@ -36,6 +36,7 @@ import (
 type Limiter interface {
 	// Take should block to make sure that the RPS is met.
 	Take() time.Time
+	NextSleepFor() (time.Time, time.Duration)
 }
 
 // Clock is the minimum necessary interface to instantiate a rate limiter with
@@ -47,7 +48,7 @@ type Clock interface {
 }
 
 type limiter struct {
-	sync.Mutex
+	sync.RWMutex
 	last       time.Time
 	sleepFor   time.Duration
 	perRequest time.Duration
@@ -61,8 +62,8 @@ type Option func(l *limiter)
 // New returns a Limiter that will limit to the given RPS.
 func New(rate int, opts ...Option) Limiter {
 	l := &limiter{
-		perRequest: time.Second / time.Duration(rate),
-		maxSlack:   -10 * time.Second / time.Duration(rate),
+		perRequest: time.Minute / time.Duration(rate),
+		maxSlack:   -10 * time.Minute / time.Duration(rate),
 	}
 	for _, opt := range opts {
 		opt(l)
@@ -90,12 +91,12 @@ func withoutSlackOption(l *limiter) {
 }
 
 // Take blocks to ensure that the time spent between multiple
-// Take calls is on average time.Second/rate.
+// Take calls is on average time.Minute/rate.
 func (t *limiter) Take() time.Time {
+	now, nextSleepFor := t.NextSleepFor()
+
 	t.Lock()
 	defer t.Unlock()
-
-	now := t.clock.Now()
 
 	// If this is our first request, then we allow it.
 	if t.last.IsZero() {
@@ -107,7 +108,7 @@ func (t *limiter) Take() time.Time {
 	// the perRequest budget and how long the last request took.
 	// Since the request may take longer than the budget, this number
 	// can get negative, and is summed across requests.
-	t.sleepFor += t.perRequest - now.Sub(t.last)
+	t.sleepFor += nextSleepFor
 
 	// We shouldn't allow sleepFor to get too negative, since it would mean that
 	// a service that slowed down a lot for a short period of time would get
@@ -128,6 +129,13 @@ func (t *limiter) Take() time.Time {
 	return t.last
 }
 
+func (t *limiter) NextSleepFor() (time.Time, time.Duration) {
+	t.RLock()
+	defer t.RUnlock()
+	now := t.clock.Now()
+	return now, t.perRequest - now.Sub(t.last)
+}
+
 type unlimited struct{}
 
 // NewUnlimited returns a RateLimiter that is not limited.
@@ -137,4 +145,8 @@ func NewUnlimited() Limiter {
 
 func (unlimited) Take() time.Time {
 	return time.Now()
+}
+
+func (unlimited) NextSleepFor() (time.Time, time.Duration) {
+	return time.Now(), time.Duration(time.Second * 0)
 }
